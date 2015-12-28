@@ -145,7 +145,13 @@ public class FabricPlugin extends CordovaPlugin {
 		this.cordova.getActivity().runOnUiThread(new Runnable() {
 			@Override
 			public void run() {
-				throw new RuntimeException("This is a crash");
+				FabricPlugin.JSException ex = prepareJsException(data);
+				if (ex!=null) {
+					Log.d(pluginName, ex.getMessage(), ex);
+					throw ex;
+				} else {
+					throw new RuntimeException("This is a crash");
+				}
 			}
 		});
 	}
@@ -155,10 +161,46 @@ public class FabricPlugin extends CordovaPlugin {
 		this.cordova.getActivity().runOnUiThread(new Runnable() {
 			@Override
 			public void run() {
-				Crashlytics.logException(new Throwable(
-						"Sending non fatal crash from JS"));
+				FabricPlugin.JSException ex = prepareJsException(data);
+				if (ex!=null) {
+					Log.d(pluginName, ex.getMessage(), ex);
+					Crashlytics.logException(ex);
+				}
 			}
 		});
+	}
+
+	private FabricPlugin.JSException prepareJsException(JSONArray data) {
+		JSONObject payload = null;
+		String message = null;
+		StackTraceElement[] frames = new StackTraceElement[0];
+
+		try {
+		  payload = data.getJSONObject(0);
+		  message = payload.getString("message");
+		} catch (JSONException e) {
+		  Log.d(pluginName, "Failed extracting message", e);
+		  return null;
+		}
+
+		try {
+		  JSONArray stack = payload.getJSONArray("stack");
+		  int nFrames = stack.length();
+		  frames = new StackTraceElement[nFrames];
+		  for (int i=0; i<nFrames; i++) {
+		    JSONObject frame = stack.getJSONObject(i);
+		    frames[i] = new StackTraceElement(
+		      frame.getString("cls"),
+		      frame.getString("fun"),
+		      frame.getString("file"),
+		      frame.getInt("line")
+		    );
+		  }
+		} catch (JSONException e) {
+		  Log.d(pluginName, "Failed extracting stack", e);
+		}
+
+		return new FabricPlugin.JSException(message, frames);
 	}
 
 	private void addLog(final JSONArray data,
@@ -281,5 +323,19 @@ public class FabricPlugin extends CordovaPlugin {
 			e.printStackTrace();
 		}
 		return null;
+	}
+
+	public static class JSException extends RuntimeException {
+	  private StackTraceElement[] frames;
+	  public JSException(String message, StackTraceElement[] frames) {
+	    super(message);
+	    this.frames = frames;
+	  }
+	  public StackTraceElement[] getStackTrace() {
+	    return frames;
+	  }
+	  public Throwable fillInStackTrace() {
+	    return this;
+	  }
 	}
 }

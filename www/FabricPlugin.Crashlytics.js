@@ -20,8 +20,22 @@ var FabricCrashlytics = (function () {
         }
     }, {
         key: 'sendCrash',
-        value: function sendCrash() {
-            window.fabric.core.execPlugin('sendCrash');
+        value: function sendCrash(message, stack) {
+            var defaults = {
+                message: message,
+                stack: stack || []
+            };
+            window.fabric.core.execPlugin('sendCrash', defaults);
+        }
+
+    }, {
+        key: 'sendNonFatalCrash',
+        value: function sendNonFatalCrash(message, stack) {
+            var defaults = {
+                message: message,
+                stack: stack || []
+            };
+            window.fabric.core.execPlugin('sendNonFatalCrash', defaults);
         }
     }, {
         key: 'setUserIdentifier',
